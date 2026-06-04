@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run MCP Server",
+      "type": "python",
+      "request": "launch",
+      "module": "src.mcp_server.server",
+      "env": {
+        "AWS_REGION": "us-gov-west-1",
+        "PARAMETER_PREFIX": "/aurora-sre-agent"
+      }
+    },
+    {
+      "name": "Run Agent Worker",
+      "type": "python",
+      "request": "launch",
+      "module": "src.agent.worker",
+      "env": {
+        "AWS_REGION": "us-gov-west-1",
+        "PARAMETER_PREFIX": "/aurora-sre-agent"
+      }
+    }
+  ]
+}

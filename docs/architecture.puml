@@ -1,0 +1,41 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+actor "CloudWatch Alarms\nDB / Infra / App" as Alarm
+queue "EventBridge\nAlarm State Change" as EB
+queue "SQS Alarm Queue\n+ DLQ" as SQS
+rectangle "Private ECS/Fargate Task" {
+  component "Agent Worker\nMCP Client" as Agent
+  component "MCP Sidecar\nFastMCP HTTP" as MCP
+  component "Aurora DBA Tool" as DBTool
+  component "Infrastructure SRE Tool" as InfraTool
+  component "Application Error SRE Tool" as AppTool
+  component "Runbook Context Tool" as RunbookTool
+  component "SMTP Email Tool" as EmailTool
+  component "ServiceNow Tool" as SNTool
+  component "S3 Audit Tool" as AuditTool
+}
+storage "Common S3 Runbook Bucket\nDB / Infra / App Runbooks" as Runbooks
+component "Bedrock Claude" as Claude
+storage "S3 Audit Logs" as Audit
+database "DynamoDB\nIdempotency" as DDB
+component "SSM Parameter Store\nSecureString Config" as SSM
+Alarm --> EB
+EB --> SQS
+SQS --> Agent
+Agent --> DDB : claim event
+Agent --> MCP : get context + runbook
+MCP --> DBTool
+MCP --> InfraTool
+MCP --> AppTool
+MCP --> RunbookTool
+RunbookTool --> Runbooks
+Agent --> Claude : alarm + context + runbook
+Agent --> MCP : create incident / email / audit
+MCP --> SNTool
+MCP --> EmailTool
+MCP --> AuditTool
+AuditTool --> Audit
+MCP --> SSM
+Agent --> SSM
+@enduml

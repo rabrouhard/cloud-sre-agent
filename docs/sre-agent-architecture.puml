@@ -1,0 +1,76 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam wrapWidth 220
+
+title Aurora DBA + SRE CloudWatch Alarm Agent - Latest Solution
+
+actor "CloudWatch Alarms\nDB / Infra / App" as Alarm
+queue "EventBridge\nAlarm State Change\nAllowlisted alarms" as EB
+queue "SQS Alarm Queue\nKMS encrypted + DLQ" as SQS
+queue "DLQ" as DLQ
+
+rectangle "Private ECS/Fargate Task\nNo public ingress" {
+  component "Agent Worker\nSQS poller\nValidator\nDomain classifier\nBedrock orchestrator" as Agent
+  component "MCP Server Sidecar\nFastMCP Streamable HTTP\nlocalhost only" as MCP
+
+  rectangle "MCP Tools" {
+    component "Aurora DBA\nContext Tool" as DBTool
+    component "Infrastructure SRE\nContext Tool" as InfraTool
+    component "Application Error\nContext Tool" as AppTool
+    component "Runbook Context\nTool" as RunbookTool
+    component "ServiceNow\nIncident Tool" as SNTool
+    component "SMTP Email\nAdvisory Tool" as EmailTool
+    component "S3 Audit\nLog Tool" as AuditTool
+  }
+}
+
+database "Aurora PostgreSQL\nClusters / Instances" as Aurora
+component "AWS Infrastructure APIs\nEC2 / ECS / ELB / ASG / Lambda" as Infra
+component "CloudWatch Metrics + Logs\nMetric datapoints + log samples" as CWLogs
+storage "Common S3 Runbook Bucket\nDatabase / Infrastructure / Application runbooks" as Runbooks
+component "SSM Parameter Store\nSecureString config" as SSM
+component "Amazon Bedrock Claude\nRunbook-grounded analysis" as Claude
+component "ServiceNow" as SN
+component "Company SMTP Relay" as SMTP
+storage "S3 Audit Logs\nReasoning + remediation + runbook version" as Audit
+database "DynamoDB\nIdempotency / Cooldown" as DDB
+control "KMS" as KMS
+control "Least-Privilege IAM" as IAM
+
+Alarm --> EB
+EB --> SQS
+SQS --> DLQ : failed retries
+SQS --> Agent : long poll
+
+Agent --> DDB : claim / dedupe
+Agent --> MCP : localhost MCP tool calls
+
+MCP --> DBTool
+MCP --> InfraTool
+MCP --> AppTool
+MCP --> RunbookTool
+MCP --> SNTool
+MCP --> EmailTool
+MCP --> AuditTool
+
+DBTool --> Aurora : read-only RDS API
+InfraTool --> Infra : describe APIs
+AppTool --> CWLogs : metrics + log samples
+RunbookTool --> Runbooks : S3 read + ETag refresh
+MCP --> SSM : config + credentials
+Agent --> SSM : runtime config
+
+Agent --> Claude : alarm + context + runbook
+SNTool --> SN : create incident
+EmailTool --> SMTP : send advisory
+AuditTool --> Audit : write structured log
+
+KMS ..> SQS
+KMS ..> Runbooks
+KMS ..> Audit
+KMS ..> SSM
+KMS ..> DDB
+IAM ..> Agent
+IAM ..> MCP
+@enduml
